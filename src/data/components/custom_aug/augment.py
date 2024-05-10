@@ -9,14 +9,9 @@ from src.data.components.custom_aug.base import *
 
 def sharp_mask(img, line_x_erosion, line_y_erosion, line_erode=True):
   threshold = cv2.threshold(cv2.cvtColor(img,  cv2.COLOR_BGR2GRAY), 200, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-#   print(threshold.shape)
   if np.average(threshold) > 0.75:
     threshold = 1 - threshold
   kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-#   closed = cv2.morphologyEx(threshold, cv2.MORPH_CLOSE, kernel, iterations=2)
-#   closed = threshold
-  # plt.imshow(closed)
-  # plt.pause(1)
   h, w = img.shape[:2]
   final = None
   if line_erode is True:
@@ -80,7 +75,14 @@ def shear_img(img, mask, shear_x, shear_y, bg_color):
                                flags=cv2.INTER_LINEAR)
   return warped[:, :, :img.shape[2]], warped[:, :, -1]
 
-def augment_img(img, rotate=0, shear_x=0, shear_y=0, noise=0, logger = None, debug = None, keep_mask = True):
+def augment_img(img, 
+                rotate=0, 
+                shear_x=0, 
+                shear_y=0, 
+                noise=0, 
+                logger = None, 
+                debug = None, 
+                keep_mask = True):
   # cài đặt thông số
   skew_angle = 0
   shear_x_level = 0
