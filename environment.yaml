@@ -1,4 +1,4 @@
-name: nlp
+name: sino_nom
 channels:
   - defaults
 dependencies:
