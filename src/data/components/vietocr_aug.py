@@ -2,8 +2,8 @@ import numpy as np
 from imgaug import augmenters as iaa
 
 class ImgAugTransform:
-  def __init__(self):
-    sometimes = lambda aug: iaa.Sometimes(0.3, aug)
+  def __init__(self, p):
+    sometimes = lambda aug: iaa.Sometimes(p, aug)
 
     self.aug = iaa.Sequential(
         iaa.SomeOf(
@@ -32,8 +32,6 @@ class ImgAugTransform:
                 #                    rotate=(-5, 5), shear=(-5, 5), 
                 #                     order=[0, 1], cval=(0, 255), 
                 #                     mode=ia.ALL)),
-
-                sometimes(iaa.PiecewiseAffine(scale=(0.01, 0.01))),
 
                 # sometimes(iaa.OneOf([iaa.Dropout(p=(0, 0.1)),
                 #                     iaa.CoarseDropout(p=(0, 0.1), size_percent=(0.02, 0.25))])),

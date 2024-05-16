@@ -8,6 +8,39 @@ import os
 ################################### GLOBAL VARIABLES ##########################################
 translator = dict()
 ################################### LOAD GLOBAL VARIABLES #####################################
+
+def thinning(mask):
+  #thinning word into a line
+  # Structuring Element
+  kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
+  close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+  # early stopping
+  if cv2.countNonZero(cv2.erode(mask,kernel)) == 0:
+    return mask
+
+  # Create an empty output image to hold values
+  thin = np.zeros(mask.shape,dtype='uint8')
+  # Loop until erosion leads to an empty set
+  while cv2.countNonZero(mask)!= 0:
+    # Erosion
+    erode = cv2.erode(mask,kernel)
+    # Opening on eroded image
+    opened = cv2.morphologyEx(erode,cv2.MORPH_OPEN,kernel)
+    # Subtract these two
+    subset = erode - opened
+    # Union of all previous sets
+    thin = cv2.bitwise_or(subset,thin)
+    # thin = cv2.morphologyEx(thin, cv2.MORPH_DILATE, kernel, iterations=1)
+    # thin = cv2.morphologyEx(thin, cv2.MORPH_CLOSE, kernel, iterations=2)
+    # thin = cv2.morphologyEx(thin, cv2.MORPH_ERODE, kernel, iterations=1)
+    # Set the eroded image for next iteration
+    mask = erode.copy()
+
+  # thin = cv2.morphologyEx(thin, cv2.MORPH_CLOSE, close_kernel, iterations=3)
+  # thin = cv2.morphologyEx(thin, cv2.MORPH_DILATE, close_kernel, iterations=1)
+  return thin
+
+
 def load_translator(dict_path):
     with open(dict_path, "r") as file:
         for line in file:
@@ -135,7 +168,7 @@ def extract_background(img):
 # 0 cho chiều dọc
 def line_erosion(mask, axis = 0, threshold=0.9):
   dist = np.average(mask, axis=axis)
-  print(dist.max(), dist.shape)
+  # print(dist.max(), dist.shape)
   for i in range(dist.shape[0]):
     if dist[i] >= threshold:
       # print("Deleted at i-th")
@@ -168,7 +201,7 @@ def masking(img, grey=False, keep_line=True, line_x_erosion=0.9, line_y_erosion=
             final = line_erosion(mask, 1, line_x_erosion)
             final = line_erosion(final, 0, line_y_erosion)
         else:
-            print("Crop row first")
+            # print("Crop row first")
             final = line_erosion(mask, 0, line_y_erosion)
             final = line_erosion(final, 1, line_x_erosion)
     else:
@@ -181,7 +214,7 @@ def masking(img, grey=False, keep_line=True, line_x_erosion=0.9, line_y_erosion=
 def recreate(img):
   median = np.mean(img, axis=(0,1))
   bg_mask = np.where(img > median)
-  print(bg_mask)
+  # print(bg_mask)
   return background
 # load_translator("/work/hpc/firedogs/potato/translate.txt")
 # load_texture("/work/hpc/firedogs/potato/asset/texture.png", intensity=2)

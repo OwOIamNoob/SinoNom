@@ -285,7 +285,7 @@ def dist_angle(mask):
   angle = np.arctan(param[0])
   return param, pcov, angle * 180 / np.pi
 
-def thinning(mask):
+def thinning(mask, iteration = 100):
   #thinning word into a line
   # Structuring Element
   kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
@@ -297,7 +297,7 @@ def thinning(mask):
   # Create an empty output image to hold values
   thin = np.zeros(mask.shape,dtype='uint8')
   # Loop until erosion leads to an empty set
-  while (cv2.countNonZero(mask)!= 0):
+  while (cv2.countNonZero(mask)!= 0) or iteration != 0:
     # Erosion
     erode = cv2.erode(mask,kernel)
     # Opening on eroded image

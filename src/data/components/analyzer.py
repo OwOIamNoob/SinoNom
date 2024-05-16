@@ -237,5 +237,32 @@ class Analyzer:
 
         return ratio
         
+    def merge_cache_val(self, export = None):
+        prefix = "../cache"
+        for key in self.cache.keys():
+            if key not in self.val.keys():
+                self.val[key] = []
+            
+            for sample in self.cache[key]:
+                self.val[key].append(os.path.join(prefix, sample))
 
+        if isinstance(export, str):
+            output = dict()
+            output['train'] = self.new_train.copy()
+
+            # merge train dataset back together
+            for key in self.new_train.keys():
+                output['train'][key] += self.new_train_hard[key]
+            
+            output['val'] = self.val
+            
+            with open(export, "w") as f:
+                json.dump(output, f, indent=4)
+                f.close()
+
+            # Reload dataset
+            self.prepare(export)
+
+            
+                
     # def query_train(self, )

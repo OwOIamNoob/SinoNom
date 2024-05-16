@@ -15,7 +15,12 @@ import numpy as np
 import math
 import shutil
 import json
-from aug.wrapper_v2 import Augmenter
+
+from src.data.components.aug.wrapper_v2 import Augmenter
+from src.data.components.vietocr_aug import ImgAugTransform
+
+
+
 
 def delete_contents_of_folder(folder_path):
     try:
@@ -29,6 +34,9 @@ def delete_contents_of_folder(folder_path):
     except Exception as e:
         print(f"Error deleting contents of the folder: {folder_path}")
 
+
+
+
 class XLADataset(Dataset):
     ''' This dataset only loads images from files into numpy arrays '''
 
@@ -38,12 +46,15 @@ class XLADataset(Dataset):
         manifest: str,
         task: str
     ):
+        super().__init__()
         self.data_dir = data_dir
         print(self.data_dir)
         self.vocab = None 
         self.task = task
-        self.samples = self.load_data(manifest)
+        self.ranges = None
         self.id2sample = None
+        self.samples = self.load_data(manifest)
+        
         if task == "val":
             self.vocab = None
 
@@ -52,49 +63,91 @@ class XLADataset(Dataset):
     
     def __getitem__(self, index) -> tuple:
         assert self.vocab is not None
-
+        assert index < len(self), "{1} is out of index of {2}".format(index, len(self))
         filename, label = self.samples[index]
-
+        # print("data: ", filename, label)
         # open & process image
-        image_path = self.data_dir + filename
+        image_path = os.path.join(self.data_dir, self.task)
+        image_path = os.path.join(image_path, filename)
         
         image = np.array(Image.open(image_path).convert("RGB"))
 
-        return {'filename': filename, 'image': image, 'label': self.vocab[label]}
+        return {'filename': filename, 'image': image, 'label': label}
 
     def load_data(self, manifest):
         samples = []
         with open(manifest, "r") as file:
             self.id2sample = json.load(file)[self.task]
-        keys = sum([[id] * len(self.id2sample[id]) for id in self.id2sample.keys()], [])
-        self.vocab = dict(zip(keys.copy(), range(len(keys))))
-        filenames = sum(list(self.id2sample.values()), [])
-        sample2id = list(zip(filenames, keys))
+        
+        keys = list(self.id2sample.keys())
+        # print("Keys range:", np.max(keys), np.min(keys))
+        self.vocab = dict(zip(keys, range(len(keys))))
+        
+        key_num = [len(self.id2sample[id]) for id in list(self.id2sample.keys())]
+        ranges = np.cumsum(key_num).tolist() + [0]
+        key_ranges = [[ranges[i-1], ranges[i]] for i in range(0, len(ranges) - 1)]
+        # get id distribution of space for upsampling 
+        self.ranges = dict(zip(keys, key_ranges))
+        print("total dataset: ", key_ranges[-2])
+        # prepares token 
+        sample2id = []
 
+        for key in keys: 
+            filenames = self.id2sample[key]
+            for fname in filenames:
+                sample2id.append([fname, self.vocab[key]])   
+        # # filenames = sum(list(self.id2sample.values()), [])
+        # # sample_keys = sum([[id] * len(self.id2sample[id]) for id in self.id2sample.keys()], [])
+        
+        # sample2id = list(zip(filenames, sample_keys))
+        print("Actual samples", len(sample2id))
         return sample2id
     
     def __len__(self):
         return len(self.samples)
+    
+    def num_classes(self):
+        return len(self.vocab)
 
 class XLATransformedDataset(Dataset):
     def __init__(
             self,
             dataset: XLADataset, 
             augmenter: Augmenter,
-            transform: transforms.Compose,
-            p = [0.6, 0.4]
+            transform: ImgAugTransform,
+            p = [0.6, 0.2, 0.2]
     ):
         assert augmenter is not None
         self.dataset = dataset
         # shape transformation
         self.augmenter = augmenter
+        self.augmenter.task = self.dataset.task
 
         # pixel transform
         self.transform = transform
+        self.p = p
 
     def __len__(self):
         return len(self.dataset)
+    
+    def __getitem__(self, index):
+        sample = self.dataset[index]
+        filename = sample['filename']
+        image = sample['image']
+        label = sample['label']
+        print("data: ", filename, label)
+        # first of all, transform the image before applying 
+        image = self.augmenter.full_augment(image, 
+                                            choice=self.p,
+                                            fname=filename,
+                                            borderMode='native')
+        if isinstance(self.transform, ImgAugTransform):
+            image = self.transform(image)
+        
+        return {'filename': filename, 'image': image, 'label': label}
 
+    def num_classes(self):
+        return self.dataset.num_classes()
     
 
 
@@ -155,9 +208,23 @@ class XLATransformedDataset(Dataset):
 if __name__ == "__main__":
     import rootutils
     rootutils.setup_root(search_from=__file__, indicator="pyproject.toml", pythonpath=True)
-    train_data_dir = "./data"
-    manifest = "./data/wb_recognition_dataset/manifest.json"
+    data_dir = "/data/hpc/potato/sinonom/data/wb_recognition_dataset/"
+    manifest = "/data/hpc/potato/sinonom/data/wb_recognition_dataset/manifest_split.json"
 
-    dataset = OCRDataset(data_dir=train_data_dir, manifest=manifest)
+    dataset = XLADataset(data_dir=data_dir, manifest=manifest, task="train")
     img = dataset[0]
     print(img['image'].shape)
+
+    augmenter = Augmenter(  texture_path="/data/hpc/potato/sinonom/data/augment/background/base/", 
+                            bg_checkpoint="/data/hpc/potato/sinonom/data/augment/background/",
+                            task="train")
+    
+    transform = ImgAugTransform(0.3)
+
+    transformed_dataset = XLATransformedDataset(dataset=dataset,
+                                                augmenter=augmenter,
+                                                transform=transform)
+    
+    sample = transformed_dataset[100]
+    print(sample['filename'])
+    print(sample['image'].shape)
