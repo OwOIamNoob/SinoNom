@@ -238,21 +238,25 @@ class Analyzer:
         return ratio
         
     def merge_cache_val(self, export = None):
-        prefix = "../cache"
+        # prefix = "../cache"
         for key in self.cache.keys():
             if key not in self.val.keys():
                 self.val[key] = []
             
             for sample in self.cache[key]:
-                self.val[key].append(os.path.join(prefix, sample))
+                full_path = os.path.join(self.cache_dir, sample)
+                output_path = full_path.replace("/", "_")
+                self.val[key].append(output_path)
+                print(output_path)
+                shutil.copy(os.path.join(self.data_dir, full_path), os.path.join(self.data_dir + "/val", output_path) )
 
         if isinstance(export, str):
             output = dict()
-            output['train'] = self.new_train.copy()
+            output['train'] = self.train.copy()
 
             # merge train dataset back together
-            for key in self.new_train.keys():
-                output['train'][key] += self.new_train_hard[key]
+            for key in self.train.keys():
+                output['train'][key] += self.train_hard[key]
             
             output['val'] = self.val
             
